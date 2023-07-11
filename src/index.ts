@@ -1,8 +1,11 @@
-import { Context, Dict, Schema, Loader } from 'koishi'
+import { Context, Dict, Schema, Loader, Time, Logger } from 'koishi'
 import { } from 'koishi-plugin-cron'
 
+const logger = new Logger('ping')
+
 export class Ping {
-  static using = ['cron']
+  static using = ['__cron__'] as const
+
   botsTime: Dict<number>
   botsRetry: Dict<number>
 
@@ -13,10 +16,7 @@ export class Ping {
     for (const key of Object.getOwnPropertyNames(reg)) {
       const i1 = key.indexOf('/'), i2 = key.indexOf(':')
       const mkey = key.slice(0, i2 === i1 ? key.length: i2)
-      // console.log(mkey)
-      // if (mkey === 'group') continue
       if (mkey === name) return [key, parent, reg[key]?.ctx]
-      // console.log(reg[key]?.ctx)
       const res = this._findPlugin(name, reg[key]?.ctx)
       if (res) return res
     }
@@ -57,24 +57,23 @@ export class Ping {
       return next()
     })
     
-    ctx.cron(`*/${config.reloadAdapterCheckInterval} * * * *`, () => {
+    ctx.cron(`*/${config.reloadAdapters.checkInterval} * * * *`, () => {
       ctx.bots.forEach(bot => {
-        if (config.reloadAdapterIntervals?.[bot.sid]
+        if (config.reloadAdapters.intervals?.[bot.sid]
           && this.botsTime[bot.sid]
-          && (Date.now() - this.botsTime[bot.sid] > 1000 * config.reloadAdapterIntervals?.[bot.sid])) {
+          && (Date.now() - this.botsTime[bot.sid] > 1000 * config.reloadAdapters.intervals?.[bot.sid])) {
             this.botsRetry[bot.sid] ++
             ctx.logger('ping').info(`${bot.sid} not responding, check`)
-            if (this.botsRetry[bot.sid] >= 2) {
+            if (this.botsRetry[bot.sid] > config.reloadAdapters.retries) {
               ctx.logger('ping').info(`${bot.sid} not responding, reload`)
-              this.reloadPlugin(bot.ctx)
+              this.reloadPlugin(bot.ctx).catch((e) => {
+                logger.error(e)
+                if (config.reloadAdapters.errorInterval)
+                  setTimeout(() => this.reloadPlugin(bot.ctx), 1000 * config.reloadAdapters.errorInterval)
+              })
             }
         }
       })
-    })
-  
-    ctx.command('bots', { authority: 4 }).action(({ session }) => {
-      console.log(ctx.bots[0].ctx)
-      console.log(this.findPlugin(ctx.bots[0].ctx))
     })
   
     ctx.command('ping', { authority: 3 }).action(() => 'pong')
@@ -90,18 +89,29 @@ export class Ping {
 }
 
 export namespace Ping {
+  
+  export interface reloadAdaptersConfig {
+    retries: number
+    checkInterval: number
+    intervals?: Dict<number>
+    errorInterval?: number
+  }
+
   export interface Config {
     notifySid: string
     notifyTarget: string
-    reloadAdapterCheckInterval: number
-    reloadAdapterIntervals?: Dict<number>
+    reloadAdapters: reloadAdaptersConfig
   }
   
   export const Config: Schema<Config> = Schema.object({
     notifySid: Schema.string(),
     notifyTarget: Schema.string(),
-    reloadAdapterCheckInterval: Schema.number().default(2),
-    reloadAdapterIntervals: Schema.dict(Number),
+    reloadAdapters: Schema.object({
+      retries: Schema.natural().default(2).description('Max retries before reloading'),
+      checkInterval: Schema.natural().default(2).description('minutes'),
+      intervals: Schema.dict(Schema.natural()).description('Intervals as offline in seconds'),
+      errorInterval: Schema.natural().default(60 * 5).description('Reload interval on reload failing in seconds'),
+    }).description('ReloadAdapters')
   })
 }
 
