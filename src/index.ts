@@ -44,7 +44,7 @@ export class Ping {
     const [key, parent, _] = this.findPlugin(plugin)??[]
     if (!key) return 'Not found'
     this.ctx.loader.unloadPlugin(parent, key)
-    await this.ctx.loader.reloadPlugin(parent, key, parent.config)
+    await this.ctx.loader.reloadPlugin(parent, key, parent.config[key])
   }
 
   constructor(public ctx: Context, public config: Ping.Config) {
@@ -66,11 +66,7 @@ export class Ping {
             ctx.logger('ping').info(`${bot.sid} not responding, check`)
             if (this.botsRetry[bot.sid] > config.reloadAdapters.retries) {
               ctx.logger('ping').info(`${bot.sid} not responding, reload`)
-              this.reloadPlugin(bot.ctx).catch((e) => {
-                logger.error(e)
-                if (config.reloadAdapters.errorInterval)
-                  setTimeout(() => this.reloadPlugin(bot.ctx), 1000 * config.reloadAdapters.errorInterval)
-              })
+              this.reloadPlugin(bot.ctx).catch(logger.error)
             }
         }
       })
@@ -94,7 +90,6 @@ export namespace Ping {
     retries: number
     checkInterval: number
     intervals?: Dict<number>
-    errorInterval?: number
   }
 
   export interface Config {
@@ -110,7 +105,6 @@ export namespace Ping {
       retries: Schema.natural().default(2).description('Max retries before reloading'),
       checkInterval: Schema.natural().default(2).description('minutes'),
       intervals: Schema.dict(Schema.natural()).description('Intervals as offline in seconds'),
-      errorInterval: Schema.natural().default(60 * 5).description('Reload interval on reload failing in seconds'),
     }).description('ReloadAdapters')
   })
 }
