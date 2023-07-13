@@ -8,6 +8,7 @@ export class Ping {
 
   botsTime: Dict<number>
   botsRetry: Dict<number>
+  curfew: Ping.TimeRange[]
 
   _findPlugin(name: string, parent: Context): [string, Context, Context] {
     if (!parent) return
@@ -47,10 +48,25 @@ export class Ping {
     await this.ctx.loader.reloadPlugin(parent, key, parent.config[key])
   }
 
+  checkCurfew() {
+    const date = new Date()
+    const time = date.getHours() * 60 + date.getMinutes()
+    for (const { start, end } of this.curfew) {
+      if (time > start && time < end) return true
+    }
+  }
+
   constructor(public ctx: Context, public config: Ping.Config) {
     this.botsTime = {}
     this.botsRetry = {}
-  
+
+    this.curfew = (config.curfew || []).map(({ start, end }) => {
+      return {
+        start: Ping.markerTimeToNumber(start),
+        end: Ping.markerTimeToNumber(end),
+      }
+    })
+
     ctx.middleware((session, next) => {
       this.botsTime[session.sid] = Date.now()
       this.botsRetry[session.sid] = 0
@@ -58,6 +74,7 @@ export class Ping {
     })
     
     ctx.cron(`*/${config.reloadAdapters.checkInterval} * * * *`, () => {
+      if (this.checkCurfew()) return
       ctx.bots.forEach(bot => {
         if (config.reloadAdapters.intervals?.[bot.sid]
           && this.botsTime[bot.sid]
@@ -66,6 +83,7 @@ export class Ping {
             ctx.logger('ping').info(`${bot.sid} not responding, check`)
             if (this.botsRetry[bot.sid] > config.reloadAdapters.retries) {
               ctx.logger('ping').info(`${bot.sid} not responding, reload`)
+              this.botsRetry[bot.sid] = 0
               this.reloadPlugin(bot.ctx).catch(logger.error)
             }
         }
@@ -86,6 +104,24 @@ export class Ping {
 
 export namespace Ping {
   
+  type SingleNumber = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+  type MarkerTime =`${SingleNumber| ''}${SingleNumber}:${SingleNumber}${SingleNumber}`
+
+  export function markerTimeToNumber(marker: MarkerTime) {
+    const [ hours, minutes ] = marker.split(':')
+    return parseInt(hours) * 60 + parseInt(minutes)
+  }
+
+  export interface TimeRange {
+    start: number
+    end: number
+  }
+
+  export interface MarkerTimeRange {
+    start: MarkerTime
+    end: MarkerTime
+  }
+
   export interface reloadAdaptersConfig {
     retries: number
     checkInterval: number
@@ -96,6 +132,7 @@ export namespace Ping {
     notifySid: string
     notifyTarget: string
     reloadAdapters: reloadAdaptersConfig
+    curfew: MarkerTimeRange[]
   }
   
   export const Config: Schema<Config> = Schema.object({
@@ -105,7 +142,11 @@ export namespace Ping {
       retries: Schema.natural().default(2).description('Max retries before reloading'),
       checkInterval: Schema.natural().default(2).description('minutes'),
       intervals: Schema.dict(Schema.natural()).description('Intervals as offline in seconds'),
-    }).description('ReloadAdapters')
+    }).description('ReloadAdapters'),
+    curfew: Schema.array(Schema.object<MarkerTimeRange>({
+      start: Schema.string().pattern(/\d{1,2}:\d{1,2}/) as any,
+      end: Schema.string().pattern(/\d{1,2}:\d{1,2}/) as any,
+    })).role('table'),
   })
 }
 
