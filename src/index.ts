@@ -1,11 +1,8 @@
 import { Context, Dict, Schema, Loader, Time, Logger } from 'koishi'
-import { } from 'koishi-plugin-cron'
 
 const logger = new Logger('ping')
 
 export class Ping {
-  static using = ['__cron__'] as const
-
   botsTime: Dict<number>
   botsRetry: Dict<number>
   curfew: Ping.TimeRange[]
@@ -73,22 +70,25 @@ export class Ping {
       return next()
     })
     
-    ctx.cron(`*/${config.reloadAdapters.checkInterval} * * * *`, () => {
-      if (this.checkCurfew()) return
-      ctx.bots.forEach(bot => {
-        if (config.reloadAdapters.intervals?.[bot.sid]
-          && this.botsTime[bot.sid]
-          && (Date.now() - this.botsTime[bot.sid] > 1000 * config.reloadAdapters.intervals?.[bot.sid])) {
-            this.botsRetry[bot.sid] ++
-            ctx.logger('ping').info(`${bot.sid} not responding, check`)
-            if (this.botsRetry[bot.sid] > config.reloadAdapters.retries) {
-              ctx.logger('ping').info(`${bot.sid} not responding, reload`)
-              this.botsRetry[bot.sid] = 0
-              this.reloadPlugin(bot.ctx).catch(logger.error)
-            }
-        }
-      })
-    })
+    if (config.reloadAdapters.checkInterval) {
+      const timer = setInterval(() => {
+        if (this.checkCurfew()) return
+        ctx.bots.forEach(bot => {
+          if (config.reloadAdapters.intervals?.[bot.sid]
+            && this.botsTime[bot.sid]
+            && (Date.now() - this.botsTime[bot.sid] > config.reloadAdapters.intervals?.[bot.sid])) {
+              this.botsRetry[bot.sid] ++
+              ctx.logger('ping').info(`${bot.sid} not responding, check`)
+              if (this.botsRetry[bot.sid] > config.reloadAdapters.retries) {
+                ctx.logger('ping').info(`${bot.sid} not responding, reload`)
+                this.botsRetry[bot.sid] = 0
+                this.reloadPlugin(bot.ctx).catch(logger.error)
+              }
+          }
+        })
+      }, config.reloadAdapters.checkInterval)
+      ctx.collect('reloadAdaptersCheck', () => (clearInterval(timer), true))
+    }
   
     ctx.command('ping', { authority: 3 }).action(() => 'pong')
   
@@ -140,8 +140,8 @@ export namespace Ping {
     notifyTarget: Schema.string(),
     reloadAdapters: Schema.object({
       retries: Schema.natural().default(2).description('Max retries before reloading'),
-      checkInterval: Schema.natural().default(2).description('minutes'),
-      intervals: Schema.dict(Schema.natural()).description('Intervals as offline in seconds'),
+      checkInterval: Schema.natural().role('ms').default(2 * Time.minute),
+      intervals: Schema.dict(Schema.natural().role('ms')).description('Intervals as offline'),
     }).description('ReloadAdapters'),
     curfew: Schema.array(Schema.object<MarkerTimeRange>({
       start: Schema.string().pattern(/\d{1,2}:\d{1,2}/) as any,
