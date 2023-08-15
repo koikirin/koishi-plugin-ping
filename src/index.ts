@@ -1,7 +1,7 @@
 import { Context, Dict, Schema, Time, Logger } from 'koishi'
-import { Loader } from '@koishijs/loader'
 
 const logger = new Logger('ping')
+const kRecord = Symbol.for('koishi.loader.record')
 
 export class Ping {
   botsTime: Dict<number>
@@ -10,7 +10,7 @@ export class Ping {
 
   _findPlugin(name: string, parent: Context): [string, Context, Context] {
     if (!parent) return
-    const reg = parent.scope[Loader.kRecord]
+    const reg = parent.scope[kRecord]
     if (!reg) return
     for (const key of Object.getOwnPropertyNames(reg)) {
       const i1 = key.indexOf('/'), i2 = key.indexOf(':')
@@ -23,7 +23,7 @@ export class Ping {
 
   _findPluginC(plugin: Context, parent: Context): [string, Context, Context] {
     if (!parent) return
-    const reg = parent.scope[Loader.kRecord]
+    const reg = parent.scope[kRecord]
     if (!reg) return
     for (const key of Object.getOwnPropertyNames(reg)) {
       if (reg[key]?.ctx === plugin) return [key, parent, reg[key]?.ctx]
