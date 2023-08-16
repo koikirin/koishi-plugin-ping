@@ -1,4 +1,4 @@
-import { Context, Dict, Schema, Time, Logger } from 'koishi'
+import { Context, Dict, Logger, Schema, Time } from 'koishi'
 
 const logger = new Logger('ping')
 const kRecord = Symbol.for('koishi.loader.record')
@@ -33,14 +33,15 @@ export class Ping {
   }
 
   findPlugin(plugin: string | Context) {
-    if (typeof plugin === 'string')
+    if (typeof plugin === 'string') {
       return this._findPlugin(plugin, this.ctx.loader.entry)
-    else
+    } else {
       return this._findPluginC(plugin, this.ctx.loader.entry)
+    }
   }
 
   async reloadPlugin(plugin: string | Context) {
-    const [key, parent, _] = this.findPlugin(plugin) ?? []
+    const [key, parent] = this.findPlugin(plugin) ?? []
     if (!key) return 'Not found'
     this.ctx.loader.unloadPlugin(parent, key)
     await this.ctx.loader.reloadPlugin(parent, key, parent.config[key])
@@ -94,13 +95,12 @@ export class Ping {
     ctx.command('ping', { authority: 3 }).action(() => 'pong')
 
     ctx.on('bot-disconnect', async (client) => {
-      if (client.sid != config.notifySid) {
+      if (client.sid !== config.notifySid) {
         const bot = ctx.bots[config.notifySid]
         if (bot) await bot.sendMessage(config.notifyTarget, `Bot <${client.sid}> Offline`)
       }
     })
   }
-
 }
 
 export namespace Ping {
@@ -123,7 +123,7 @@ export namespace Ping {
     end: MarkerTime
   }
 
-  export interface reloadAdaptersConfig {
+  export interface ReloadAdaptersConfig {
     retries: number
     checkInterval: number
     intervals?: Dict<number>
@@ -132,7 +132,7 @@ export namespace Ping {
   export interface Config {
     notifySid: string
     notifyTarget: string
-    reloadAdapters: reloadAdaptersConfig
+    reloadAdapters: ReloadAdaptersConfig
     curfew: MarkerTimeRange[]
   }
 
