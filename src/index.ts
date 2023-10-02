@@ -73,7 +73,7 @@ export class Ping {
     })
 
     if (config.reloadAdapters.checkInterval) {
-      const timer = setInterval(() => {
+      ctx.setInterval(() => {
         if (this.checkCurfew()) return
         ctx.bots.forEach(bot => {
           if (config.reloadAdapters.intervals?.[bot.sid]
@@ -89,7 +89,6 @@ export class Ping {
           }
         })
       }, config.reloadAdapters.checkInterval)
-      ctx.collect('reloadAdaptersCheck', () => (clearInterval(timer), true))
     }
 
     ctx.command('ping', { authority: 3 }).action(() => 'pong')
