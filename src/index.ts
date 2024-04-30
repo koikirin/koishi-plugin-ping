@@ -48,7 +48,7 @@ export class Ping {
       }, config.reloadAdapters.checkInterval)
     }
 
-    ctx.command('ping', { authority: 3 }).action(() => 'pong')
+    config.ping && ctx.command('ping', { authority: 3 }).action(() => 'pong')
 
     ctx.on('bot-disconnect', async (client) => {
       if (client.sid !== config.notifySid) {
@@ -60,6 +60,7 @@ export class Ping {
 }
 
 export namespace Ping {
+  export const reusable = true
 
   type SingleNumber = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
   type MarkerTime = `${SingleNumber | ''}${SingleNumber}:${SingleNumber}${SingleNumber}`
@@ -86,6 +87,7 @@ export namespace Ping {
   }
 
   export interface Config {
+    ping: boolean
     notifySid: string
     notifyTarget: string
     reloadAdapters: ReloadAdaptersConfig
@@ -93,6 +95,7 @@ export namespace Ping {
   }
 
   export const Config: Schema<Config> = Schema.object({
+    ping: Schema.boolean().default(true),
     notifySid: Schema.string(),
     notifyTarget: Schema.string(),
     reloadAdapters: Schema.object({
