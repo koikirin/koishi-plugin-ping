@@ -1,6 +1,8 @@
 import { Context, Dict, Schema, Time } from 'koishi'
 
 export class Ping {
+  static name = 'ping'
+
   botsTime: Dict<number>
   botsRetry: Dict<number>
   curfew: Ping.TimeRange[]
@@ -37,9 +39,9 @@ export class Ping {
           if (config.reloadAdapters.intervals?.[bot.sid]
             && (!this.botsTime[bot.sid] || Date.now() - this.botsTime[bot.sid] > config.reloadAdapters.intervals?.[bot.sid])) {
             this.botsRetry[bot.sid] = (this.botsRetry[bot.sid] ?? 0) + 1
-            ctx.logger('ping').info(`${bot.sid} not responding, check`)
+            ctx.logger.info(`${bot.sid} not responding, check`)
             if (this.botsRetry[bot.sid] > config.reloadAdapters.retries) {
-              ctx.logger('ping').info(`${bot.sid} not responding, reload`)
+              ctx.logger.info(`${bot.sid} not responding, reload`)
               this.botsRetry[bot.sid] = 0
               bot.ctx.scope.update(bot.ctx.config, true)
             }
@@ -54,6 +56,16 @@ export class Ping {
       if (client.sid !== config.notifySid) {
         const bot = ctx.bots[config.notifySid]
         if (bot) await bot.sendMessage(config.notifyTarget, `Bot <${client.sid}> Offline`)
+      }
+      if (config.reloadOnDisconnect) {
+        ctx.logger.info(`${client.sid} disconnected, reload after ${config.reloadOnDisconnectDelay} ms`)
+        const sid = client.sid
+        ctx.setTimeout(() => {
+          const bot = ctx.bots[sid]
+          if (!bot) return
+          ctx.logger.info(`${client.sid} disconnected, try reloading`)
+          bot.ctx.scope.update(bot.ctx.config, true)
+        }, config.reloadOnDisconnectDelay)
       }
     })
   }
@@ -90,6 +102,8 @@ export namespace Ping {
     ping: boolean
     notifySid: string
     notifyTarget: string
+    reloadOnDisconnect: boolean
+    reloadOnDisconnectDelay: number
     reloadAdapters: ReloadAdaptersConfig
     curfew: MarkerTimeRange[]
   }
@@ -98,6 +112,8 @@ export namespace Ping {
     ping: Schema.boolean().default(true),
     notifySid: Schema.string(),
     notifyTarget: Schema.string(),
+    reloadOnDisconnect: Schema.boolean().default(false),
+    reloadOnDisconnectDelay: Schema.natural().role('ms').default(5 * Time.minute),
     reloadAdapters: Schema.object({
       retries: Schema.natural().default(2).description('Max retries before reloading'),
       checkInterval: Schema.natural().role('ms').default(2 * Time.minute),
