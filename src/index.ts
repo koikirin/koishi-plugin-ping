@@ -1,4 +1,4 @@
-import { Context, Dict, Schema, Time } from 'koishi'
+import { Context, Dict, Schema, Time, Universal } from 'koishi'
 
 export class Ping {
   static name = 'ping'
@@ -52,7 +52,8 @@ export class Ping {
 
     config.ping && ctx.command('ping', { authority: 3 }).action(() => 'pong')
 
-    ctx.on('bot-disconnect', async (client) => {
+    ctx.on('bot-status-updated', async (client) => {
+      if (client.status === Universal.Status.ONLINE) return
       if (client.sid !== config.notifySid) {
         const bot = ctx.bots[config.notifySid]
         if (bot) await bot.sendMessage(config.notifyTarget, `Bot <${client.sid}> Offline`)
@@ -62,7 +63,7 @@ export class Ping {
         const sid = client.sid
         ctx.setTimeout(() => {
           const bot = ctx.bots[sid]
-          if (!bot) return
+          if (!bot || bot.status === Universal.Status.ONLINE) return
           ctx.logger.info(`${client.sid} disconnected, try reloading`)
           bot.ctx.scope.update(bot.ctx.config, true)
         }, config.reloadOnDisconnectDelay)
