@@ -53,6 +53,7 @@ export class Ping {
     config.ping && ctx.command('ping', { authority: 3 }).action(() => 'pong')
 
     ctx.on('bot-status-updated', async (client) => {
+      if (client.platform.startsWith('sandbox:')) return
       if (client.status === Universal.Status.ONLINE) return
       if (client.sid !== config.notifySid) {
         const bot = ctx.bots[config.notifySid]
