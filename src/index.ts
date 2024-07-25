@@ -1,5 +1,4 @@
 import { Context, Dict, Schema, Time, Universal } from 'koishi'
-
 export class Ping {
   static name = 'ping'
 
@@ -43,7 +42,8 @@ export class Ping {
             if (this.botsRetry[bot.sid] > config.reloadAdapters.retries) {
               ctx.logger.info(`${bot.sid} not responding, reload`)
               this.botsRetry[bot.sid] = 0
-              bot.ctx.scope.update(bot.ctx.config, true)
+              // @ts-expect-error
+              bot.context.scope.update(bot.context.config, true)
             }
           }
         })
@@ -66,7 +66,8 @@ export class Ping {
           const bot = ctx.bots[sid]
           if (!bot || bot.status === Universal.Status.ONLINE) return
           ctx.logger.info(`${client.sid} disconnected, try reloading`)
-          bot.ctx.scope.update(bot.ctx.config, true)
+          // @ts-expect-error
+          bot.context.scope.update(bot.context.config, true)
         }, config.reloadOnDisconnectDelay)
       }
     })
