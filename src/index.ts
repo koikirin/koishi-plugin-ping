@@ -65,7 +65,9 @@ export class Ping {
         ctx.setTimeout(() => {
           const bot = ctx.bots[sid]
           if (!bot || bot.status === Universal.Status.ONLINE) return
+          if (this.botsTime[sid] && Date.now() - this.botsTime[bot.sid] < config.reloadOnDisconnectDelay) return
           ctx.logger.info(`${client.sid} disconnected, try reloading`)
+          this.botsTime[sid] = Date.now()
           // @ts-expect-error
           bot.context.scope.update(bot.context.config, true)
         }, config.reloadOnDisconnectDelay)

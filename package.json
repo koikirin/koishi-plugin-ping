@@ -1,7 +1,7 @@
 {
   "name": "@hieuzest/koishi-plugin-ping",
   "description": "Auto-reload bots to ensure your bot alive",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
